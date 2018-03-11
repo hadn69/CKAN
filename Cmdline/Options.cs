@@ -15,7 +15,7 @@ namespace CKAN.CmdLine
 
     public class Options
     {
-        public string action { get; set; }
+        public string action  { get; set; }
         public object options { get; set; }
 
         /// <summary>
@@ -28,7 +28,7 @@ namespace CKAN.CmdLine
             (
                 args, new Actions(), (verb, suboptions) =>
                 {
-                    action = verb;
+                    action  = verb;
                     options = suboptions;
                 },
                 delegate
@@ -49,6 +49,9 @@ namespace CKAN.CmdLine
         [VerbOption("consoleui", HelpText = "Start the CKAN console UI")]
         public ConsoleUIOptions ConsoleUIOptions { get; set; }
 
+        [VerbOption("prompt", HelpText = "Run CKAN prompt for executing multiple commands in a row")]
+        public CommonOptions PromptOptions { get; set; }
+
         [VerbOption("search", HelpText = "Search for mods")]
         public SearchOptions SearchOptions { get; set; }
 
@@ -66,6 +69,9 @@ namespace CKAN.CmdLine
 
         [VerbOption("remove", HelpText = "Remove an installed mod")]
         public RemoveOptions Remove { get; set; }
+
+        [VerbOption("import", HelpText = "Import manually downloaded mods")]
+        public ImportOptions Import { get; set; }
 
         [VerbOption("scan", HelpText = "Scan for manually installed KSP mods")]
         public ScanOptions Scan { get; set; }
@@ -88,13 +94,16 @@ namespace CKAN.CmdLine
         [VerbOption("ksp", HelpText = "Manage KSP installs")]
         public SubCommandOptions KSP { get; set; }
 
+        [VerbOption("authtoken", HelpText = "Manage authentication tokens")]
+        public AuthTokenSubOptions AuthToken { get; set; }
+
         [VerbOption("compat", HelpText = "Manage KSP version compatibility")]
         public SubCommandOptions Compat { get; set; }
 
         [VerbOption("compare", HelpText = "Compare version strings")]
         public CompareOptions Compare { get; set; }
 
-        [VerbOption("version", HelpText = "Show the version of the CKAN client being used.")]
+        [VerbOption("version", HelpText = "Show the version of the CKAN client being used")]
         public VersionOptions Version { get; set; }
 
         [HelpVerbOption]
@@ -131,6 +140,9 @@ namespace CKAN.CmdLine
                         break;
                     case "compare":
                         ht.AddPreOptionsLine($"Usage: ckan {verb} [options] version1 version2");
+                        break;
+                    case "import":
+                        ht.AddPreOptionsLine($"Usage: ckan {verb} [options] paths");
                         break;
 
                     // Now the commands with only --flag type options
@@ -233,6 +245,24 @@ namespace CKAN.CmdLine
             }
 
             return Exit.OK;
+        }
+
+        /// <summary>
+        /// Combine two options objects.
+        /// This is mainly to ensure that --headless carries through for prompt.
+        /// </summary>
+        /// <param name="otherOpts">Options object to merge into this one</param>
+        public void Merge(CommonOptions otherOpts)
+        {
+            if (otherOpts != null)
+            {
+                Verbose      = Verbose      || otherOpts.Verbose;
+                Debug        = Debug        || otherOpts.Debug;
+                Debugger     = Debugger     || otherOpts.Debugger;
+                NetUserAgent = NetUserAgent ?? otherOpts.NetUserAgent;
+                Headless     = Headless     || otherOpts.Headless;
+                AsRoot       = AsRoot       || otherOpts.AsRoot;
+            }
         }
 
         private static void CheckMonoVersion(IUser user, int rec_major, int rec_minor, int rec_patch)
@@ -398,7 +428,12 @@ namespace CKAN.CmdLine
 
     internal class VersionOptions   : CommonOptions { }
     internal class CleanOptions     : InstanceSpecificOptions { }
-    internal class AvailableOptions : InstanceSpecificOptions { }
+
+    internal class AvailableOptions : InstanceSpecificOptions
+    {
+        [Option("detail", HelpText = "Show short description of each module")]
+        public bool detail { get; set; }
+    }
 
     internal class GuiOptions : InstanceSpecificOptions
     {
@@ -431,6 +466,12 @@ namespace CKAN.CmdLine
 
         [Option("all", DefaultValue = false, HelpText = "Remove all installed mods.")]
         public bool rmall { get; set; }
+    }
+
+    internal class ImportOptions : InstanceSpecificOptions
+    {
+        [ValueList(typeof(List<string>))]
+        public List<string> paths { get; set; }
     }
 
     internal class ShowOptions : InstanceSpecificOptions

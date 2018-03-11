@@ -103,18 +103,29 @@ namespace CKAN
         public static IEnumerable<string> GetAuthTokenHosts()
         {
             RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(authTokenKeyNoPrefix);
-            return key?.GetValueNames();
+            return key?.GetValueNames() ?? new string[0];
         }
 
         /// <summary>
         /// Set an auth token in the registry
         /// </summary>
         /// <param name="host">Host for which to set the token</param>
-        /// <param name="token">Token to set</param>
+        /// <param name="token">Token to set, or null to delete</param>
         public static void SetAuthToken(string host, string token)
         {
             ConstructKey(authTokenKeyNoPrefix);
-            Microsoft.Win32.Registry.SetValue(authTokenKey, host, token);
+            if (!string.IsNullOrEmpty(host))
+            {
+                if (string.IsNullOrEmpty(token))
+                {
+                    RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(authTokenKeyNoPrefix, true);
+                    key.DeleteValue(host);
+                }
+                else
+                {
+                    Microsoft.Win32.Registry.SetValue(authTokenKey, host, token);
+                }
+            }
         }
 
         private static string StripPrefixKey(string keyname)

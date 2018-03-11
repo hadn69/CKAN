@@ -4,6 +4,7 @@
 // License: CC-BY 4.0, LGPL, or MIT (your choice)
 
 using System;
+using System.Net;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -50,12 +51,28 @@ namespace CKAN.CmdLine
             Logging.Initialize();
             log.Info("CKAN started.");
 
+            // Force-allow TLS 1.2 for HTTPS URLs, because GitHub requires it.
+            // This is on by default in .NET 4.6, but not in 4.5.
+            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+
             // If we're starting with no options then invoke the GUI instead.
             if (args.Length == 0)
             {
                 return Gui(new GuiOptions(), args);
             }
 
+            try
+            {
+                return Execute(null, null, args);
+            }
+            finally
+            {
+                RegistryManager.DisposeAll();
+            }
+        }
+
+        public static int Execute(KSPManager manager, CommonOptions opts, string[] args)
+        {
             // We shouldn't instantiate Options if it's a subcommand.
             // It breaks command-specific help, for starters.
             try
@@ -63,20 +80,19 @@ namespace CKAN.CmdLine
                 switch (args[0])
                 {
                     case "repair":
-                        var repair = new Repair();
-                        return repair.RunSubCommand(new SubCommandOptions(args));
+                        return (new Repair()).RunSubCommand(manager, opts, new SubCommandOptions(args));
 
                     case "ksp":
-                        var ksp = new KSP();
-                        return ksp.RunSubCommand(new SubCommandOptions(args));
+                        return (new KSP()).RunSubCommand(manager, opts, new SubCommandOptions(args));
 
                     case "compat":
-                        var compat = new CompatSubCommand();
-                        return compat.RunSubCommand(new SubCommandOptions(args));
+                        return (new Compat()).RunSubCommand(manager, opts, new SubCommandOptions(args));
 
                     case "repo":
-                        var repo = new Repo();
-                        return repo.RunSubCommand(new SubCommandOptions(args));
+                        return (new Repo()).RunSubCommand(manager, opts, new SubCommandOptions(args));
+
+                    case "authtoken":
+                        return (new AuthToken()).RunSubCommand(manager, opts, new SubCommandOptions(args));
                 }
             }
             catch (NoGameInstanceKraken)
@@ -104,8 +120,16 @@ namespace CKAN.CmdLine
 
             // Process commandline options.
             CommonOptions options = (CommonOptions)cmdline.options;
+            options.Merge(opts);
             IUser user = new ConsoleUser(options.Headless);
-            KSPManager manager = new KSPManager(user);
+            if (manager == null)
+            {
+                manager = new KSPManager(user);
+            }
+            else
+            {
+                manager.User = user;
+            }
 
             try
             {
@@ -155,28 +179,31 @@ namespace CKAN.CmdLine
                     case "consoleui":
                         return ConsoleUi(options, args);
 
+                    case "prompt":
+                        return new Prompt().RunCommand(manager, cmdline.options);
+
                     case "version":
                         return Version(user);
 
                     case "update":
-                        return (new Update(user)).RunCommand(GetGameInstance(manager), (UpdateOptions)cmdline.options);
+                        return (new Update(user)).RunCommand(GetGameInstance(manager), cmdline.options);
 
                     case "available":
-                        return (new Available(user)).RunCommand(GetGameInstance(manager), (AvailableOptions)cmdline.options);
+                        return (new Available(user)).RunCommand(GetGameInstance(manager), cmdline.options);
 
                     case "add":
                     case "install":
                         Scan(GetGameInstance(manager), user, cmdline.action);
-                        return (new Install(user)).RunCommand(GetGameInstance(manager), (InstallOptions)cmdline.options);
+                        return (new Install(user)).RunCommand(GetGameInstance(manager), cmdline.options);
 
                     case "scan":
                         return Scan(GetGameInstance(manager), user);
 
                     case "list":
-                        return (new List(user)).RunCommand(GetGameInstance(manager), (ListOptions)cmdline.options);
+                        return (new List(user)).RunCommand(GetGameInstance(manager), cmdline.options);
 
                     case "show":
-                        return (new Show(user)).RunCommand(GetGameInstance(manager), (ShowOptions)cmdline.options);
+                        return (new Show(user)).RunCommand(GetGameInstance(manager), cmdline.options);
 
                     case "search":
                         return (new Search(user)).RunCommand(GetGameInstance(manager), options);
@@ -188,6 +215,9 @@ namespace CKAN.CmdLine
                     case "upgrade":
                         Scan(GetGameInstance(manager), user, cmdline.action);
                         return (new Upgrade(user)).RunCommand(GetGameInstance(manager), cmdline.options);
+
+                    case "import":
+                        return (new Import(user)).RunCommand(GetGameInstance(manager), options);
 
                     case "clean":
                         return Clean(GetGameInstance(manager));
@@ -203,10 +233,6 @@ namespace CKAN.CmdLine
             catch (NoGameInstanceKraken)
             {
                 return printMissingInstanceError(user);
-            }
-            finally
-            {
-                RegistryManager.DisposeAll();
             }
         }
 

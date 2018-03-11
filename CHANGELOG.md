@@ -2,7 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
-## v1.24.0-PRE2
+## v1.24.1
+
+### Bugfixes
+
+- [Multiple] Fix crash when trying to view empty auth token list (#2301 by: HebaruSan; reviewed: politas)
+- [GUI] Handle mod not found in versions tab (#2303 by: HebaruSan; reviewed: politas)
+- [GUI] Better resizing for Select KSP Install window (#2306 by: HebaruSan; reviewed: politas)
+- [GUI] Fix GUI sort by size (#2311 by: HebaruSan; reviewed: politas)
+- [Core] Don't crash if download_hash isn't set (#2313 by: HebaruSan; reviewed: politas)
+- [GUI] Fix GUI instance name checking (#2316 by: HebaruSan; reviewed: politas)
+- [Core] Fix ArgumentOutOfRangeException when removing files from game root (#2332 by: HebaruSan; reviewed: politas)
+- [Core] Obey version properties of conflicts and depends relationships in sanity checks (#2339 by: HebaruSan; reviewed: politas)
+- [Netkan] Invalidate stale cached files from GitHub in Netkan (#2337 by: HebaruSan; reviewed: politas)
+
+### Internal
+
+- [Build] Improve CKAN.app launch script (#2329 by: HebaruSan; reviewed: politas)
+- [Build] Fix building on macOS (#2341 by: phardy; reviewed: HebaruSan, politas)
+- [Build] Fix autoupdater tests on TLS-fragile platforms (#2344 by: HebaruSan; reviewed: politas)
+
+## v1.24.0 (Bruce)
 
 ### Features
 
@@ -10,6 +30,11 @@ All notable changes to this project will be documented in this file.
 - [GUI] Add status and progress bar at the bottom of the window (#2245 by: HebaruSan; reviewed: Olympic1)
 - [GUI] Add import downloads menu item to GUI (#2246 by: HebaruSan; reviewed: politas)
 - [Core] Accept header and infrastructure for auth tokens (#2263 by: HebaruSan; reviewed: dbent)
+- [CLI] Add Cmdline import command (#2264 by: HebaruSan; reviewed: politas)
+- [Multiple] User interfaces for auth tokens (#2266 by: HebaruSan; reviewed: politas)
+- [CLI] Add a read-execute-print-loop prompt for Cmdline (#2273 by: HebaruSan; reviewed: politas)
+- [Core] Fallback to archive.org URLs for failed downloads of FOSS packages (#2284 by: HebaruSan; reviewed: techman83, politas)
+- [CLI] Show abstracts in available command (#2286 by: HebaruSan; reviewed: politas)
 
 ### Bugfixes
 
@@ -20,6 +45,16 @@ All notable changes to this project will be documented in this file.
 - [Core] Fix missing filename in install -c log message (No PR, by: HebaruSan)
 - [GUI] Leave out children already shown in ancestor node (#2258 by: HebaruSan; reviewed: politas)
 - [GUI] Resolve provides for install-from-ckan-file (#2259 by: HebaruSan; reviewed: politas)
+- [Build] Use arch=32 for OSX (#2270 by: HebaruSan; reviewed: techman83)
+- [Multiple] Retry of failed downloads (#2277 by: HebaruSan; reviewed: politas)
+- [CLI] Print fewer download updates in headless mode (#2256 by: HebaruSan; reviewed: politas)
+- [Core] Point to wiki page about certs on cert errors (#2279 by: HebaruSan; reviewed: politas)
+- [Multiple] Handle invalid installs better (#2283 by: HebaruSan; reviewed: politas)
+- [Core] Capture error details from SharpZipLib for invalid ZIPs (#2287 by: HebaruSan; reviewed: politas)
+- [Netkan] Check zip validity in netkan (#2288 by: HebaruSan; reviewed: politas)
+- [Core] Replace colons with hyphens in archive URLs (#2290 by: HebaruSan; reviewed: techman83)
+- [Core] Force-allow TLS 1.2 on .NET 4.5 (#2297 by: HebaruSan; reviewed: politas)
+
 
 ## v1.24.0-PRE1 (McCandless)
 

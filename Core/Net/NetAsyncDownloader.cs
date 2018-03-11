@@ -22,18 +22,22 @@ namespace CKAN
         private class NetAsyncDownloaderDownloadPart
         {
             public Uri url;
+            public Uri fallbackUrl;
             public WebClient agent = new WebClient();
             public DateTime lastProgressUpdateTime;
             public string path;
             public long bytesLeft;
             public long size;
             public int bytesPerSecond;
+            public bool triedFallback;
             public Exception error;
             public int lastProgressUpdateSize;
 
             public NetAsyncDownloaderDownloadPart(Net.DownloadTarget target, string path = null)
             {
                 this.url  = target.url;
+                this.fallbackUrl = target.fallbackUrl;
+                this.triedFallback = false;
                 this.path = path ?? Path.GetTempFileName();
                 size = bytesLeft = target.size;
                 lastProgressUpdateTime = DateTime.Now;
@@ -54,7 +58,7 @@ namespace CKAN
                 {
                     log.InfoFormat("Using auth token for {0}", this.url.Host);
                     // Send our auth token to the GitHub API (or whoever else needs one)
-                    agent.Headers.Add("Authentication", $"token {token}");
+                    agent.Headers.Add("Authorization", $"token {token}");
                 }
             }
         }
@@ -294,20 +298,37 @@ namespace CKAN
             }
 
             // Check to see if we've had any errors. If so, then release the kraken!
-            var exceptions = downloads
-                .Select(x => x.error)
-                .Where(ex => ex != null)
-                .ToList();
-
-            // Let's check if any of these are certificate errors. If so,
-            // we'll report that instead, as this is common (and user-fixable)
-            // under Linux.
-            if (exceptions.Any(ex => ex is WebException &&
-                Regex.IsMatch(ex.Message, "authentication or decryption has failed")))
+            List<KeyValuePair<int, Exception>> exceptions = new List<KeyValuePair<int, Exception>>();
+            for (int i = 0; i < downloads.Count; ++i)
             {
-                throw new MissingCertificateKraken();
+                if (downloads[i].error != null)
+                {
+                    // Check if it's a certificate error. If so, report that instead,
+                    // as this is common (and user-fixable) under Linux.
+                    if (downloads[i].error is WebException)
+                    {
+                        WebException wex = downloads[i].error as WebException;
+                        if (certificatePattern.IsMatch(wex.Message))
+                        {
+                            throw new MissingCertificateKraken();
+                        }
+                        else switch ((wex.Response as HttpWebResponse)?.StatusCode)
+                        {
+                            // Handle HTTP 403 used for throttling
+                            case HttpStatusCode.Forbidden:
+                                Uri infoUrl;
+                                if (Net.ThrottledHosts.TryGetValue(downloads[i].url.Host, out infoUrl))
+                                {
+                                    throw new DownloadThrottledKraken(downloads[i].url, infoUrl);
+                                }
+                                break;
+                        }
+                    }
+                    // Otherwise just note the error and which download it came from,
+                    // then throw them all at once later.
+                    exceptions.Add(new KeyValuePair<int, Exception>(i, downloads[i].error));
+                }
             }
-
             if (exceptions.Count > 0)
             {
                 throw new DownloadErrorsKraken(exceptions);
@@ -315,6 +336,11 @@ namespace CKAN
 
             // Yay! Everything worked!
         }
+
+        private static readonly Regex certificatePattern = new Regex(
+            @"authentication or decryption has failed",
+            RegexOptions.Compiled
+        );
 
         /// <summary>
         /// <see cref="IDownloader.CancelDownload()"/>
@@ -387,9 +413,9 @@ namespace CKAN
             {
                 // Math.Ceiling was added to avoid showing 0 MiB left when finishing
                 User.RaiseProgress(
-                    String.Format("{0} kbps - downloading - {1:f0} MB left",
-                        totalBytesPerSecond/1024,
-                        Math.Ceiling((double)totalBytesLeft/1024/1024)),
+                    String.Format("{0}/sec - downloading - {1} left",
+                        CkanModule.FmtSize(totalBytesPerSecond),
+                        CkanModule.FmtSize(totalBytesLeft)),
                     totalPercentage);
             }
         }
@@ -404,37 +430,54 @@ namespace CKAN
             if (error != null)
             {
                 log.InfoFormat("Error downloading {0}: {1}", downloads[index].url, error);
+
+                // Check whether we were already downloading the fallback url
+                if (!downloads[index].triedFallback && downloads[index].fallbackUrl != null)
+                {
+                    log.InfoFormat("Trying fallback URL: {0}", downloads[index].fallbackUrl);
+                    // Try the fallbackUrl
+                    downloads[index].triedFallback = true;
+                    downloads[index].agent.DownloadFileAsync(downloads[index].fallbackUrl, downloads[index].path);
+                    // Short circuit the completion process so the fallback can run
+                    return;
+                }
+                else
+                {
+                    // If there was an error, remember it, but we won't raise it until
+                    // all downloads are finished or cancelled.
+                    downloads[index].error = error;
+                }
             }
             else
             {
                 log.InfoFormat("Finished downloading {0}", downloads[index].url);
             }
-            completed_downloads++;
 
-            // If there was an error, remember it, but we won't raise it until
-            // all downloads are finished or cancelled.
-            downloads[index].error = error;
-
-            if (completed_downloads == downloads.Count)
+            if (++completed_downloads == downloads.Count)
             {
-                log.Info("All files finished downloading");
-
-                // If we have a callback, then signal that we're done.
-
-                var fileUrls = new Uri[downloads.Count];
-                var filePaths = new string[downloads.Count];
-                var errors = new Exception[downloads.Count];
-
-                for (int i = 0; i < downloads.Count; i++)
-                {
-                    fileUrls[i] = downloads[i].url;
-                    filePaths[i] = downloads[i].path;
-                    errors[i] = downloads[i].error;
-                }
-
-                log.Debug("Signalling completion via callback");
-                triggerCompleted(fileUrls, filePaths, errors);
+                FinalizeDownloads();
             }
         }
+
+        private void FinalizeDownloads()
+        {
+            log.Info("All files finished downloading");
+
+            Uri[]       fileUrls  = new Uri[downloads.Count];
+            string[]    filePaths = new string[downloads.Count];
+            Exception[] errors    = new Exception[downloads.Count];
+
+            for (int i = 0; i < downloads.Count; ++i)
+            {
+                fileUrls[i]  = downloads[i].url;
+                filePaths[i] = downloads[i].path;
+                errors[i]    = downloads[i].error;
+            }
+
+            // If we have a callback, then signal that we're done.
+            log.Debug("Signalling completion via callback");
+            triggerCompleted(fileUrls, filePaths, errors);
+        }
+
     }
 }

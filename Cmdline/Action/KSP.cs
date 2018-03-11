@@ -13,16 +13,16 @@ namespace CKAN.CmdLine
         internal class KSPSubOptions : VerbCommandOptions
         {
             [VerbOption("list",    HelpText = "List KSP installs")]
-            public CommonOptions ListOptions { get; set; }
+            public CommonOptions ListOptions     { get; set; }
 
             [VerbOption("add",     HelpText = "Add a KSP install")]
-            public AddOptions AddOptions { get; set; }
+            public AddOptions    AddOptions      { get; set; }
 
             [VerbOption("rename",  HelpText = "Rename a KSP install")]
-            public RenameOptions RenameOptions { get; set; }
+            public RenameOptions RenameOptions   { get; set; }
 
             [VerbOption("forget",  HelpText = "Forget a KSP install")]
-            public ForgetOptions ForgetOptions { get; set; }
+            public ForgetOptions ForgetOptions   { get; set; }
 
             [VerbOption("default", HelpText = "Set the default KSP install")]
             public DefaultOptions DefaultOptions { get; set; }
@@ -94,7 +94,7 @@ namespace CKAN.CmdLine
         }
 
         // This is required by ISubCommand
-        public int RunSubCommand(SubCommandOptions unparsed)
+        public int RunSubCommand(KSPManager manager, CommonOptions opts, SubCommandOptions unparsed)
         {
             string[] args = unparsed.options.ToArray();
 
@@ -123,8 +123,9 @@ namespace CKAN.CmdLine
                 if (!string.IsNullOrEmpty(option) && suboptions != null)
                 {
                     CommonOptions options = (CommonOptions)suboptions;
-                    User = new ConsoleUser(options.Headless);
-                    Manager = new KSPManager(User);
+                    options.Merge(opts);
+                    User     = new ConsoleUser(options.Headless);
+                    Manager  = manager ?? new KSPManager(User);
                     exitCode = options.Handle(Manager, User);
                     if (exitCode != Exit.OK)
                         return;
@@ -159,7 +160,6 @@ namespace CKAN.CmdLine
                     }
                 }
             }, () => { exitCode = MainClass.AfterHelp(); });
-            RegistryManager.DisposeAll();
             return exitCode;
         }
 
@@ -168,24 +168,15 @@ namespace CKAN.CmdLine
 
         private int ListInstalls()
         {
-            string preferredGameDir = null;
-
-            var preferredInstance = Manager.GetPreferredInstance();
-
-            if (preferredInstance != null)
-            {
-                preferredGameDir = preferredInstance.GameDir();
-            }
-
             var output = Manager.Instances
-                .OrderByDescending(i => i.Value.GameDir() == preferredGameDir)
+                .OrderByDescending(i => i.Value.Name == Manager.AutoStartInstance)
                 .ThenByDescending(i => i.Value.Version() ?? KspVersion.Any)
                 .ThenBy(i => i.Key)
                 .Select(i => new
                 {
                     Name = i.Key,
                     Version = i.Value.Version()?.ToString() ?? "<NONE>",
-                    Default = i.Value.GameDir() == preferredGameDir ? "Yes" : "No",
+                    Default = i.Value.Name == Manager.AutoStartInstance ? "Yes" : "No",
                     Path = i.Value.GameDir()
                 })
                 .ToList();

@@ -203,7 +203,7 @@ namespace CKAN.ConsoleUI {
             // Show total download size of all installed mods
             AddObject(new ConsoleLabel(
                 1, -1, searchWidth,
-                () => $"{Formatting.FmtSize(totalInstalledDownloadSize())} installed",
+                () => $"{CkanModule.FmtSize(totalInstalledDownloadSize())} installed",
                 null,
                 () => ConsoleTheme.Current.DimLabelFg
             ));
@@ -256,6 +256,9 @@ namespace CKAN.ConsoleUI {
                 new ConsoleMenuOption("Select KSP install...",      "",
                     "Switch to a different game instance",
                     true, SelectInstall),
+                new ConsoleMenuOption("Authentication tokens...",     "",
+                    "Edit authentication tokens sent to download servers",
+                    true, EditAuthTokens),
                 null,
                 new ConsoleMenuOption("Help",                  helpKey,
                     "Tips & tricks",
@@ -274,7 +277,7 @@ namespace CKAN.ConsoleUI {
             mainMenu = new ConsolePopupMenu(opts);
 
             LeftHeader   = () => $"CKAN {Meta.GetVersion()}";
-            CenterHeader = () => $"KSP {manager.CurrentInstance.Version().ToString()} ({manager.CurrentInstance.Name})";
+            CenterHeader = () => $"KSP {manager.CurrentInstance.Version()} ({manager.CurrentInstance.Name})";
         }
 
         // Alt+H doesn't work on Mac, but F1 does, and we need
@@ -433,6 +436,12 @@ namespace CKAN.ConsoleUI {
                 registry = RegistryManager.Instance(manager.CurrentInstance).registry;
                 RefreshList();
             }
+            return true;
+        }
+
+        private bool EditAuthTokens()
+        {
+            LaunchSubScreen(new AuthTokenScreen());
             return true;
         }
 

@@ -63,8 +63,10 @@ namespace CKAN
         /// <summary>
         /// Report whether it's possible to run the auto-updater.
         /// Checks whether we can overwrite the running ckan.exe.
+        /// Windows doesn't let us check this because it locks the EXE
+        /// for a running process, so assume we can always overwrite on Windows.
         /// </summary>
-        public static readonly bool CanUpdate = CanWrite(exePath);
+        public static readonly bool CanUpdate = Platform.IsWindows || CanWrite(exePath);
 
         /// <summary>
         /// Our metadata is considered fetched if we have a latest version, release notes,
@@ -86,15 +88,17 @@ namespace CKAN
 
             try
             {
-                fetchedCkanUrl = RetrieveUrl(response, 0);
                 // Check whether the release includes the auto updater
                 foreach (var asset in response.assets)
                 {
                     string url = asset.browser_download_url.ToString();
-                    if (url.EndsWith("AutoUpdater.exe"))
+                    if (url.EndsWith("ckan.exe"))
+                    {
+                        fetchedCkanUrl    = new Tuple<Uri, long>(new Uri(url), (long)asset.size);
+                    }
+                    else if (url.EndsWith("AutoUpdater.exe"))
                     {
                         fetchedUpdaterUrl = new Tuple<Uri, long>(new Uri(url), (long)asset.size);
-                        break;
                     }
                 }
                 if (fetchedUpdaterUrl == null)
@@ -147,8 +151,8 @@ namespace CKAN
             Net.DownloadWithProgress(
                 new[]
                 {
-                    new Net.DownloadTarget(fetchedUpdaterUrl.Item1, updaterFilename, fetchedUpdaterUrl.Item2),
-                    new Net.DownloadTarget(fetchedCkanUrl.Item1,    ckanFilename,    fetchedCkanUrl.Item2),
+                    new Net.DownloadTarget(fetchedUpdaterUrl.Item1, null, updaterFilename, fetchedUpdaterUrl.Item2),
+                    new Net.DownloadTarget(fetchedCkanUrl.Item1,    null, ckanFilename,    fetchedCkanUrl.Item2),
                 },
                 user
             );

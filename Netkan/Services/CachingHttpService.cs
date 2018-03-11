@@ -11,9 +11,9 @@ namespace CKAN.NetKAN.Services
             _cache = cache;
         }
 
-        public string DownloadPackage(Uri url, string identifier)
+        public string DownloadPackage(Uri url, string identifier, DateTime? updated)
         {
-            var cachedFile = _cache.GetCachedFilename(url);
+            var cachedFile = _cache.GetCachedFilename(url, updated);
 
             if (!string.IsNullOrWhiteSpace(cachedFile))
             {
@@ -41,6 +41,11 @@ namespace CKAN.NetKAN.Services
                         break;
                     case FileType.Zip:
                         extension = "zip";
+                        string invalidReason;
+                        if (!NetFileCache.ZipValid(downloadedFile, out invalidReason))
+                        {
+                            throw new Kraken($"{downloadedFile} is not a valid ZIP file: {invalidReason}");
+                        }
                         break;
                     default:
                         extension = "ckan-package";

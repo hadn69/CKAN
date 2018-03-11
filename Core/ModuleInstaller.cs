@@ -168,7 +168,12 @@ namespace CKAN
             {
                 if (!ksp.Cache.IsCachedZip(module))
                 {
-                    User.RaiseMessage(" * {0} {1} ({2})", module.name, module.version, module.download.Host);
+                    User.RaiseMessage(" * {0} {1} ({2}, {3})",
+                        module.name,
+                        module.version,
+                        module.download.Host,
+                        CkanModule.FmtSize(module.download_size)
+                    );
                     downloads.Add(module);
                 }
                 else
@@ -213,7 +218,7 @@ namespace CKAN
 
                 registry_manager.Save(!options.without_enforce_consistency);
 
-                User.RaiseProgress("Commiting filesystem changes", 80);
+                User.RaiseProgress("Committing filesystem changes", 80);
 
                 transaction.Complete();
 
@@ -250,7 +255,7 @@ namespace CKAN
 
                 registry_manager.Save(!options.without_enforce_consistency);
 
-                User.RaiseProgress("Commiting filesystem changes", 80);
+                User.RaiseProgress("Committing filesystem changes", 80);
 
                 transaction.Complete();
             }
@@ -1092,7 +1097,8 @@ namespace CKAN
         /// <param name="files">Set of files to import</param>
         /// <param name="user">Object for user interaction</param>
         /// <param name="installMod">Function to call to mark a mod for installation</param>
-        public void ImportFiles(HashSet<FileInfo> files, IUser user, Action<string> installMod)
+        /// <param name="allowDelete">True to ask user whether to delete imported files, false to leave the files as is</param>
+        public void ImportFiles(HashSet<FileInfo> files, IUser user, Action<string> installMod, bool allowDelete = true)
         {
             Registry         registry    = registry_manager.registry;
             HashSet<string>  installable = new HashSet<string>();
@@ -1134,7 +1140,7 @@ namespace CKAN
                 }
                 ++i;
             }
-            if (installable.Count > 0 && user.RaiseYesNoDialog($"Install {installable.Count} compatible imported mods?"))
+            if (installable.Count > 0 && user.RaiseYesNoDialog($"Install {installable.Count} compatible imported mods in game instance {ksp.Name} ({ksp.GameDir()})?"))
             {
                 // Install the imported mods
                 foreach (string identifier in installable)
@@ -1142,7 +1148,7 @@ namespace CKAN
                     installMod(identifier);
                 }
             }
-            if (user.RaiseYesNoDialog($"Import complete. Delete {deletable.Count} old files?"))
+            if (allowDelete && deletable.Count > 0 && user.RaiseYesNoDialog($"Import complete. Delete {deletable.Count} old files?"))
             {
                 // Delete old files
                 foreach (FileInfo f in deletable)

@@ -53,6 +53,44 @@ namespace CKAN
         }
 
         /// <summary>
+        /// Check whether any of the modules in a given list match this descriptor.
+        /// NOTE: Only proper modules can be checked for versions!
+        ///       DLLs match all versions, as do "provides" clauses.
+        /// </summary>
+        /// <param name="modules">Sequence of modules to consider</param>
+        /// <param name="dlls">Sequence of DLLs to consider</param>
+        /// <returns>
+        /// true if any of the modules match this descriptor, false otherwise.
+        /// </returns>
+        public bool MatchesAny(IEnumerable<CkanModule> modules, HashSet<string> dlls)
+        {
+            // DLLs are considered to match any version
+            if (dlls != null && dlls.Contains(name))
+            {
+                return true;
+            }
+            if (modules != null)
+            {
+                // See if anyone else "provides" the target name
+                // Note that versions can't be checked for "provides" clauses
+                if (modules.Any(m =>
+                    m.identifier != name && m.provides != null && m.provides.Contains(name)))
+                {
+                    return true;
+                }
+                // See if the real thing is there
+                foreach (CkanModule m in modules.Where(m => m.identifier == name))
+                {
+                    if (version_within_bounds(m.version))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
         /// A user friendly message for what versions satisfies this descriptor.
         /// </summary>
         [JsonIgnore]
@@ -66,6 +104,27 @@ namespace CKAN
                     min_version != null ? min_version.ToString() : "any version",
                     max_version != null ? max_version.ToString() : "any version");
             }
+        }
+
+        /// <summary>
+        /// Generate a user readable description of the relationship
+        /// </summary>
+        /// <returns>
+        /// Depending on the version properties, one of:
+        /// name
+        /// name version
+        /// name min_version -- max_version
+        /// name min_version or later
+        /// name max_version or earlier
+        /// </returns>
+        public override string ToString()
+        {
+            return
+                  version     != null                        ? $"{name} {version}"
+                : min_version != null && max_version != null ? $"{name} {min_version} -- {max_version}"
+                : min_version != null                        ? $"{name} {min_version} or later"
+                : max_version != null                        ? $"{name} {max_version} or earlier"
+                : name;
         }
 
     }
@@ -621,6 +680,45 @@ namespace CKAN
                 descriptions.Add(mid.DescribeMatch());
             }
             return string.Join(", ", descriptions);
+        }
+
+        /// <summary>
+        /// Return an archive.org URL for this download, or null if it's not there.
+        /// The filenames look a lot like the filenames in Net.Cache, but don't be fooled!
+        /// Here it's the first 8 characters of the SHA1 of the DOWNLOADED FILE, not the URL!
+        /// </summary>
+        public Uri InternetArchiveDownload
+        {
+            get
+            {
+                string verStr = version.ToString().Replace(':', '-');
+                // Some alternate registry repositories don't set download_hash
+                return (download_hash?.sha1 != null && license.All(l => l.Redistributable))
+                    ? new Uri(
+                        $"https://archive.org/download/{identifier}-{verStr}/{download_hash.sha1.Substring(0, 8)}-{identifier}-{verStr}.zip")
+                    : null;
+            }
+        }
+
+        /// <summary>
+        /// Format a byte count into readable file size
+        /// </summary>
+        /// <param name="bytes">Number of bytes in a file</param>
+        /// <returns>
+        /// ### bytes or ### KB or ### MB or ### GB
+        /// </returns>
+        public static string FmtSize(long bytes)
+        {
+            const double K = 1024;
+            if (bytes < K) {
+                return $"{bytes} B";
+            } else if (bytes < K * K) {
+                return $"{bytes / K :N1} KB";
+            } else if (bytes < K * K * K) {
+                return $"{bytes / K / K :N1} MB";
+            } else {
+                return $"{bytes / K / K / K :N1} GB";
+            }
         }
     }
 
