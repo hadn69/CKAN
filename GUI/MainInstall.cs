@@ -504,7 +504,7 @@ namespace CKAN
                 {
                     Tag = module,
                     Checked = !suggested,
-                    Text = CurrentInstance.Cache.IsCachedZip(pair.Key)
+                    Text = CurrentInstance.Cache.IsMaybeCachedZip(pair.Key)
                         ? $"{pair.Key.name} {pair.Key.version} (cached)"
                         : $"{pair.Key.name} {pair.Key.version} ({pair.Key.download.Host ?? ""}, {CkanModule.FmtSize(pair.Key.download_size)})"
                 };

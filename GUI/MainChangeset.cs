@@ -48,7 +48,7 @@ namespace CKAN
 
                 ListViewItem item = new ListViewItem()
                 {
-                    Text = CurrentInstance.Cache.IsCachedZip(change.Mod.ToModule())
+                    Text = CurrentInstance.Cache.IsMaybeCachedZip(change.Mod.ToModule())
                         ? $"{change.Mod.Name} {change.Mod.Version} (cached)"
                         : $"{change.Mod.Name} {change.Mod.Version} ({change.Mod.ToModule()?.download.Host ?? ""}, {change.Mod.DownloadSize})"
                 };
